@@ -1,0 +1,61 @@
+import numpy as np
+from PIL import Image
+from scipy.ndimage import convolve
+import time
+
+start_time = time.time()
+
+# Define edge detection kernel (Sobel kernel for example)
+sobel_x = np.array([[-1, 0, 1],
+                   [-2, 0, 2],
+                   [-1, 0, 1]])
+
+sobel_y = np.array([[-1, -2, -1],
+                   [ 0,  0,  0],
+                   [ 1,  2,  1]])
+
+# Number of mock images
+n = 1000  # Number of mock images to process
+
+# Create paths for the mock images
+image_a_paths = [f"mock_images/B00001_a_{i}.tiff" for i in range(n)]
+image_b_paths = [f"mock_images/B00001_b_{i}.tiff" for i in range(n)]
+
+# Create a list structure with n elements containing 'a' and 'b' fields (image pairs)
+images = [{"a": Image.open(image_a_paths[i]).convert("L"),
+           "b": Image.open(image_b_paths[i]).convert("L")}
+          for i in range(n)]
+
+# Convert images to numpy arrays for processing
+for i, img_pair in enumerate(images):
+    img_pair["a"] = np.array(img_pair["a"], dtype=np.float32)
+    img_pair["b"] = np.array(img_pair["b"], dtype=np.float32)
+
+# Apply edge detection to each image in the structure
+for i, img_pair in enumerate(images):
+    # Apply Sobel edge detection to image 'a'
+    edges_a_x = convolve(img_pair["a"], sobel_x)
+    edges_a_y = convolve(img_pair["a"], sobel_y)
+    edges_a = np.sqrt(edges_a_x**2 + edges_a_y**2)  # Combine x and y edges
+
+    # Apply Sobel edge detection to image 'b'
+    edges_b_x = convolve(img_pair["b"], sobel_x)
+    edges_b_y = convolve(img_pair["b"], sobel_y)
+    edges_b = np.sqrt(edges_b_x**2 + edges_b_y**2)  # Combine x and y edges
+
+    # Replace the original images with the edge-detected images
+    images[i]["a"] = edges_a
+    images[i]["b"] = edges_b
+
+# Save or display the results (optional)
+for i, img_pair in enumerate(images):
+    edge_a_img = Image.fromarray(np.clip(img_pair["a"], 0, 255).astype(np.uint8))
+    edge_b_img = Image.fromarray(np.clip(img_pair["b"], 0, 255).astype(np.uint8))
+
+    edge_a_img.save(f"edge_B00001_a_{i}.tiff")
+    edge_b_img.save(f"edge_B00001_b_{i}.tiff")
+
+print("Edge detection applied using kernels and results saved.")
+
+end_time = time.time()
+print(f"Original code took {end_time - start_time:.2f} seconds.")

@@ -1,0 +1,67 @@
+
+from PIL import Image
+from scipy.ndimage import convolve
+from concurrent.futures import ProcessPoolExecutor
+import time
+import numpy as np
+
+start_time = time.time()
+
+# Define edge detection kernels
+sobel_x = np.array([[-1, 0, 1],
+                    [-2, 0, 2],
+                    [-1, 0, 1]])
+
+sobel_y = np.array([[-1, -2, -1],
+                    [ 0,  0,  0],
+                    [ 1,  2,  1]])
+
+# Function to process a chunk of images
+def process_chunk(chunk_indices, mock_image_dir):
+    for index in chunk_indices:
+        # Load and preprocess images
+        image_a_path = f"{mock_image_dir}/B00001_a_{index}.tiff"
+        image_b_path = f"{mock_image_dir}/B00001_b_{index}.tiff"
+
+        image_a = Image.open(image_a_path).convert("L")
+        image_b = Image.open(image_b_path).convert("L")
+        image_a_np = np.array(image_a, dtype=np.float32)
+        image_b_np = np.array(image_b, dtype=np.float32)
+
+        # Apply Sobel edge detection to image 'a'
+        edges_a_x = convolve(image_a_np, sobel_x)
+        edges_a_y = convolve(image_a_np, sobel_y)
+        edges_a = np.sqrt(edges_a_x**2 + edges_a_y**2)  # Combine x and y edges
+
+        # Apply Sobel edge detection to image 'b'
+        edges_b_x = convolve(image_b_np, sobel_x)
+        edges_b_y = convolve(image_b_np, sobel_y)
+        edges_b = np.sqrt(edges_b_x**2 + edges_b_y**2)  # Combine x and y edges
+
+        # Convert results to images and save
+        edge_a_img = Image.fromarray(np.clip(edges_a, 0, 255).astype(np.uint8))
+        edge_b_img = Image.fromarray(np.clip(edges_b, 0, 255).astype(np.uint8))
+        edge_a_img.save(f"edge_B00001_a_{index}.tiff")
+        edge_b_img.save(f"edge_B00001_b_{index}.tiff")
+
+def main():
+    # Parameters
+    n = 1000  # Number of image pairs
+    mock_image_dir = "mock_images"  # Directory for mock images
+    num_workers = 4  # Number of parallel workers
+
+    # Divide indices into chunks for each worker
+    indices = list(range(n))
+    chunks = [indices[i::num_workers] for i in range(num_workers)]  # Distribute indices evenly
+
+    # Process in parallel
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(process_chunk, chunk, mock_image_dir) for chunk in chunks]
+
+    print("Edge detection applied in parallel and results saved.")
+
+if __name__ == '__main__':
+    main()
+
+end_time = time.time()
+print(f"Parrallel time took {end_time - start_time:.2f} seconds.")
